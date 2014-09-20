@@ -5,6 +5,7 @@
 int main() {
   zmq::context_t context(1);
   zmq::socket_t socket(context, ZMQ_REP);
+  { int ipv6 = 1; socket.setsockopt(ZMQ_IPV6, &ipv6, 4); }
   socket.bind("tcp://*:5500");
 
   for (int k = 1; ; ++k) {

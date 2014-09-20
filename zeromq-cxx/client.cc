@@ -6,7 +6,8 @@
 int main() {
   zmq::context_t context(1);
   zmq::socket_t socket(context, ZMQ_REQ);
-  socket.connect("tcp://localhost:5500");
+  { int ipv6 = 1; socket.setsockopt(ZMQ_IPV6, &ipv6, 4); }
+  socket.connect("tcp://[::1]:5500");
   latency_t measure;
 
   usleep(100000);
