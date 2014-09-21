@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import Control.Concurrent (threadDelay)
-import Control.Monad (forever, forM_, when)
+import Control.Monad (forever, forM_, when, replicateM_)
 import Control.Distributed.Process
 import Control.Distributed.Process.Node
 import Data.ByteString (ByteString)
@@ -23,7 +23,11 @@ server =
      register "server" myPid
      say "Server started"
      forever $ receiveWait
-       [ match replyBack
+       [ match $ \(_::Int) -> return ()
+       , match $ \(_::Maybe [(Integer,Double)]) -> return ()
+       , matchIf (\(x :: Rational) -> x < 179 / 918723817) $ \_ -> return ()
+       , match $ \(_::[[[[[[[[Bool]]]]]]]]) -> return ()
+       , match replyBack
        , match $ \sender -> send sender myPid
        ]
   where
@@ -39,6 +43,9 @@ client serverNid = do
   nsendRemote serverNid "server" myPid
   serverPid <- expect
 
+  -- Annoy the server:
+  replicateM_ 500 $ send serverPid (998172387/117 :: Rational)
+
   liftIO $ hSetBuffering stdout NoBuffering
   measure <- L.new
   forM_ [1..1000::Int] $ \k -> do
@@ -48,7 +55,7 @@ client serverNid = do
     L.stop measure
     liftIO $ do putStr "."
                 when (k `mod` 40 == 0) $ putStr "\n"
-                threadDelay 20000
+                -- threadDelay 20000
   L.print measure
 
 --------------------------------------------------------------------------------
