@@ -13,6 +13,7 @@ module Histogram (
 import Data.Int
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IM
+import Data.Monoid
 import Prelude hiding (print)
 import Text.Printf
 
@@ -25,6 +26,10 @@ data Histogram = Hist { _count :: {-# UNPACK #-} !Int
 
 empty :: Histogram
 empty = Hist 0 0 IM.empty
+
+instance Monoid Histogram where
+  mempty = empty
+  mappend (Hist c1 s1 b1) (Hist c2 s2 b2) = Hist (c1+c2) (s1+s2) (IM.unionWith (+) b1 b2)
 
 stepBase :: Double
 stepBase = log 10 / 10
