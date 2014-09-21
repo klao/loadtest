@@ -5,21 +5,18 @@ module Latency where
 import Control.Monad.IO.Class
 import Data.Int
 import Data.IORef
-import Text.Printf
 
 import Clock
+import qualified Histogram as H
 
-data Lat = Lat { _count :: {-# UNPACK #-} !Int
-               , _sum :: {-# UNPACK #-} !Int64
-               , _min :: {-# UNPACK #-} !Int64
-               , _max :: {-# UNPACK #-} !Int64
-               , _start :: {-# UNPACK #-} !Int64
+data Lat = Lat { _start :: {-# UNPACK #-} !Int64
+               , _hist :: !H.Histogram
                }
 
 type LatR = IORef Lat
 
 new :: MonadIO m => m LatR
-new = liftIO . newIORef $ Lat 0 0 maxBound 0 (-1)
+new = liftIO . newIORef $ Lat (-1) H.empty
 
 modify :: MonadIO m => IORef a -> (a -> a) -> m ()
 modify r f = liftIO . atomicModifyIORef' r $ (\x -> (f x, ()))
@@ -37,15 +34,11 @@ stop r = do
   modify r (\Lat{..} ->
              if _start == -1 then error "stop when not started"
              else let diff = t - _start in
-             Lat (_count + 1) (_sum + diff) (min diff _min) (max diff _max) (-1)
+             Lat (-1) (H.insert diff _hist)
            )
 
 print :: MonadIO m => LatR -> m ()
 print r = liftIO $ readIORef r >>= p
   where
-    p Lat{..} = printf "mean: %.2f,  min: %.2f,  max: %.2f\n" meanms minms maxms
-      where
-        nsInms = 1000000.0 :: Double
-        meanms = fromIntegral _sum / fromIntegral _count / nsInms
-        minms = fromIntegral _min / nsInms
-        maxms = fromIntegral _max / nsInms
+    p Lat{..} = H.print ns2ms _hist
+    ns2ms = (/ 1000000)
