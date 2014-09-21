@@ -1,39 +1,57 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 import Control.Concurrent (threadDelay)
-import Control.Monad (forever)
+import Control.Monad (forever, forM_, when)
 import Control.Distributed.Process
--- import Control.Distributed.Process.Internal.Types
 import Control.Distributed.Process.Node
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import Network.Transport (EndPointAddress(..))
 import Network.Transport.TCP (createTransport, defaultTCPParameters)
 import System.Environment (getArgs)
+import System.IO
 
-replyBack :: (ProcessId, String) -> Process ()
-replyBack (sender, _msg) = send sender "YYY"
+import qualified Latency as L
 
-logMessage :: String -> Process ()
-logMessage msg = say $ "handling " ++ msg
+--------------------------------------------------------------------------------
+-- Server
 
 server :: Process ()
-server = do
-  myPid <- getSelfPid
-  register "server" myPid
-  say "Server started"
-  -- ProcessId _ myPid <- getSelfPid
-  -- liftIO $ print myPid
-  forever $ receiveWait [match logMessage, match replyBack]
+server =
+  do myPid <- getSelfPid
+     register "server" myPid
+     say "Server started"
+     forever $ receiveWait
+       [ match replyBack
+       , match $ \sender -> send sender myPid
+       ]
+  where
+    replyBack :: (ProcessId, ByteString) -> Process ()
+    replyBack (sender, _msg) = send sender ("YYY" :: ByteString)
+
+--------------------------------------------------------------------------------
+-- Client
 
 client :: NodeId -> Process ()
 client serverNid = do
   myPid <- getSelfPid
-  nsendRemote serverNid "server" "hello"
-  nsendRemote serverNid "server" (myPid, "XX")
+  nsendRemote serverNid "server" myPid
+  serverPid <- expect
 
-  m <- expectTimeout 1000000
-  case m of
-    Nothing  -> die "nothing came back!"
-    Just s   -> say $ "got " ++ s ++ " back!"
+  liftIO $ hSetBuffering stdout NoBuffering
+  measure <- L.new
+  forM_ [1..1000::Int] $ \k -> do
+    L.start measure
+    send serverPid (myPid, "XX" :: ByteString)
+    (_ :: ByteString) <- expect
+    L.stop measure
+    liftIO $ do putStr "."
+                when (k `mod` 40 == 0) $ putStr "\n"
+                threadDelay 20000
+  L.print measure
 
+--------------------------------------------------------------------------------
 
 main :: IO ()
 main = do
@@ -47,10 +65,11 @@ main = do
   node <- newLocalNode t initRemoteTable
 
   let theirNid = NodeId $ EndPointAddress $ BS.pack $ "127.0.0.1:" ++ them ++ ":0"
-  -- print theirNid
   case role of
     "server" -> runProcess node server
     "client" -> runProcess node $ client theirNid
     _ -> error "bad role"
 
+  -- This is needed to see what the client process logs right before
+  -- exiting:
   threadDelay 100000

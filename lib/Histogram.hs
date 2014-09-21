@@ -70,7 +70,7 @@ percentileLin hist pct = (low * (n - k) + high * k) / n
 
 print :: (Double -> Double) -> Histogram -> IO ()
 print u hist@(Hist{..}) =
-  do printf "count: %d (check: %d),  mean: %.3f\n" _count (sum $ IM.elems _bins) mean
+  do printf "count: %d,  mean: %.3f\n" _count mean
      printf "  min: %.3f, 1%%: %.3f, 5%%: %.3f,   95%%: %.3f, 99%%: %.3f, max: %.3f\n"
        p0 p1 p5 p95 p99 p100
      mapM_ printBin $ IM.toAscList _bins
