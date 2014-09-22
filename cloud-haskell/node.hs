@@ -44,7 +44,7 @@ client serverNid = do
   serverPid <- expect
 
   -- Annoy the server:
-  replicateM_ 500 $ send serverPid (998172387/117 :: Rational)
+  -- replicateM_ 500 $ send serverPid (998172387/117 :: Rational)
 
   liftIO $ hSetBuffering stdout NoBuffering
   measure <- L.new
