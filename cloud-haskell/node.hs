@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import Control.Concurrent (threadDelay)
-import Control.Monad (forever, forM_, when, replicateM_)
+import Control.Monad (forever, forM_, when)
 import Control.Distributed.Process
 import Control.Distributed.Process.Node
 import Data.ByteString (ByteString)
@@ -60,22 +60,23 @@ client serverNid = do
 
 --------------------------------------------------------------------------------
 
+data Role = Client | Server
+
 main :: IO ()
 main = do
-  [role] <- getArgs
-  let (me, them) = case role of
-        "server" -> ("5501", "5502")
-        "client" -> ("5502", "5501")
-        _ -> error $ "bad role: " ++ role
+  args <- getArgs
+  let (me, them, role) = case args of
+        ["server"] -> ("5501", "5502", Server)
+        ["client"] -> ("5502", "5501", Client)
+        _ -> error $ "usage: ./node <server|client>"
 
   Right t <- createTransport "127.0.0.1" me defaultTCPParameters
   node <- newLocalNode t initRemoteTable
 
   let theirNid = NodeId $ EndPointAddress $ BS.pack $ "127.0.0.1:" ++ them ++ ":0"
   case role of
-    "server" -> runProcess node server
-    "client" -> runProcess node $ client theirNid
-    _ -> error "bad role"
+    Server -> runProcess node server
+    Client -> runProcess node $ client theirNid
 
   -- This is needed to see what the client process logs right before
   -- exiting:
